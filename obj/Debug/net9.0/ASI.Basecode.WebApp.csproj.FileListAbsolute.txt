@@ -727,3 +727,4 @@ C:\Users\Eric\Documents\Alliance\backend\ASI.Basecode.WebApp\obj\Debug\net9.0\re
 C:\Users\Eric\Documents\Alliance\backend\ASI.Basecode.WebApp\obj\Debug\net9.0\ASI.Basecode.WebApp.pdb
 C:\Users\Eric\Documents\Alliance\backend\ASI.Basecode.WebApp\obj\Debug\net9.0\ASI.Basecode.WebApp.genruntimeconfig.cache
 C:\Users\Eric\Documents\Alliance\backend\ASI.Basecode.WebApp\obj\Debug\net9.0\ref\ASI.Basecode.WebApp.dll
+C:\Users\Eric\Documents\Alliance\backend\ASI.Basecode.WebApp\obj\Debug\net9.0\ASI.Basecode.WebApp.sourcelink.json
