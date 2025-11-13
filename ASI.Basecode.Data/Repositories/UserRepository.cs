@@ -2,6 +2,7 @@
 using ASI.Basecode.Data.Models;
 using Basecode.Data.Repositories;
 using System.Linq;
+using System.Collections.Generic;
 
 namespace ASI.Basecode.Data.Repositories
 {
@@ -12,10 +13,19 @@ namespace ASI.Basecode.Data.Repositories
 
         }
 
-        public IQueryable<User> GetUsers()
+        public IEnumerable<User> GetUsers() 
         {
-            return this.GetDbSet<User>();
+            return this.GetDbSet<User>().ToList();
         }
 
+        public void AddUser(User user)
+        {
+            this.GetDbSet<User>().Add(user);
+        }
+
+        public void Delete(User user)
+        {
+            this.GetDbSet<User>().Remove(user);
+        }
     }
 }

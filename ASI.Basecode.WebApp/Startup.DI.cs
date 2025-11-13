@@ -50,6 +50,15 @@ namespace ASI.Basecode.WebApp
                                       .AllowAnyMethod());
             });
             this._services.AddControllers();
+
+            this._services.AddScoped<IRoomRepository, RoomRepository>();
+            this._services.AddScoped<IAmenityRepository, AmenityRepository>();
+            this._services.AddScoped<IRoomService, RoomService>();
+
+            this._services.AddScoped<IBookingRepository, BookingRepository>();
+            this._services.AddScoped<IBookingService, BookingService>();
+
+            this._services.AddScoped<IUnitOfWork, UnitOfWork>();
         }
     }
 }

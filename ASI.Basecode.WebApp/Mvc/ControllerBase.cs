@@ -132,7 +132,7 @@ namespace ASI.Basecode.WebApp.Mvc
             string actionMethod = this.ControllerContext.RouteData.Values["action"].ToString();
 
             StringBuilder logContent = new StringBuilder();
-            logContent.AppendLine($"\n======================================== start ========================================");
+            logContent.AppendLine($"\n======================================== start ==========  ==============================");
             logContent.AppendLine($"■ API Controller Name: \n\t{controllerName}");
             logContent.AppendLine($"■ API Action Method: \n\t{actionMethod}");
             logContent.AppendLine($"■ API Request Model: \n\t{request}");

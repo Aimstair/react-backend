@@ -15,6 +15,7 @@ namespace ASI.Basecode.WebApp
         private readonly SymmetricSecurityKey _signingKey;
         private readonly TokenValidationParameters _tokenValidationParameters;
         private readonly TokenProviderOptions _tokenProviderOptions;
+        
 
         /// <summary>
         /// Configure authorization

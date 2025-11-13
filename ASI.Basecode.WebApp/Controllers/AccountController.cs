@@ -1,6 +1,7 @@
 ﻿using ASI.Basecode.Data.Models;
 using ASI.Basecode.Services.Interfaces;
 using ASI.Basecode.Services.Manager;
+using ASI.Basecode.Services.ServiceModels;
 using ASI.Basecode.WebApp.Authentication;
 using ASI.Basecode.WebApp.Models;
 using ASI.Basecode.WebApp.Mvc;
@@ -10,11 +11,16 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using System;
+using System.Linq;
 using System.Threading.Tasks;
+using static ASI.Basecode.Resources.Constants.Enums;
 
 namespace ASI.Basecode.WebApp.Controllers
 {
     [Route("api/[controller]/[action]")]
+    [ApiController]
+    [Route("api/[controller]")]
     public class AccountController : ControllerBase<AccountController>
     {
         private readonly SessionManager _sessionManager;
@@ -58,19 +64,121 @@ namespace ASI.Basecode.WebApp.Controllers
         /// Login Method
         /// </summary>
 
-        [HttpPost]
+        [HttpPost("Login")]
         [AllowAnonymous]
-        public async Task<IActionResult> Login([FromBody] LoginViewModel model)
-
+        public IActionResult Login([FromBody] LoginViewModel model)
         {
-            this._session.SetString("HasSession", "Exist");
+            try
+            {
+                if (string.IsNullOrEmpty(model.UserId) || string.IsNullOrEmpty(model.Password))
+                {
+                    return BadRequest(new { success = false, message = "Username and password are required" });
+                }
 
-            User user = null;
+                User user = null;
+                var result = _userService.AuthenticateUser(model.UserId, model.Password, ref user);
 
-            //await this._signInManager.SignInAsync(user);
-            this._session.SetString("UserName", model.UserId);
+                if (result == LoginResult.Success && user != null)
+                {
+                    this._session.SetString("HasSession", "Exist");
+                    this._session.SetString("UserName", model.UserId);
 
-            return Ok(user);
+                    return Ok(new
+                    {
+                        success = true,
+                        message = "Login successful",
+                        user = new
+                        {
+                            id = user.Id,
+                            userId = user.UserId,
+                            username = user.UserId, // Add this for consistency
+                            name = user.Name ?? $"{user.FirstName} {user.LastName}".Trim(),
+                            firstName = user.FirstName,
+                            lastName = user.LastName,
+                            role = user.Role // This should be "user", "admin", or "super admin"
+                        }
+                    });
+                }
+                else
+                {
+                    return BadRequest(new { success = false, message = "Invalid username or password" });
+                }
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { success = false, message = $"Login failed: {ex.Message}" });
+            }
+        }
+
+        [HttpPost("Register")]
+        [AllowAnonymous]
+        public IActionResult Register([FromBody] RegisterRequest request)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(request.UserId))
+                {
+                    return BadRequest(new { message = "Username is required" });
+                }
+
+                if (string.IsNullOrEmpty(request.Password))
+                {
+                    return BadRequest(new { message = "Password is required" });
+                }
+
+                if (string.IsNullOrEmpty(request.FirstName))
+                {
+                    return BadRequest(new { message = "First name is required" });
+                }
+
+                if (string.IsNullOrEmpty(request.LastName))
+                {
+                    return BadRequest(new { message = "Last name is required" });
+                }
+
+                // Check if user already exists
+                var existingUsers = _userService.GetUsers();
+                if (existingUsers.Any(u => u.UserId == request.UserId))
+                {
+                    return BadRequest(new { message = "User already exists" });
+                }
+
+                // Create new user
+                var newUser = new UserViewModel
+                {
+                    UserId = request.UserId,
+                    Password = request.Password,
+                    FirstName = request.FirstName,
+                    LastName = request.LastName,
+                    Role = request.Role ?? "user",
+                    Email = string.IsNullOrWhiteSpace(request.Email) ? "" : request.Email, // Don't use UserId as fallback
+                    CreatedBy = "System",
+                    CreatedTime = DateTime.Now,
+                    UpdatedBy = "System",
+                    UpdatedTime = DateTime.Now
+                };
+
+                _userService.AddUser(newUser);
+
+                return Ok(new { message = "Registration successful" });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Register error: {ex.Message}");
+                Console.WriteLine($"Stack trace: {ex.StackTrace}");
+                return BadRequest(new { message = $"Registration failed: {ex.Message}" });
+            }
+        }
+
+        // UPDATE your RegisterRequest class to include Role:
+        public class RegisterRequest
+        {
+            public string UserId { get; set; }
+            public string Password { get; set; }
+            public string FirstName { get; set; }
+            public string LastName { get; set; }
+            public string Role { get; set; }
+            public string Email { get; set; } 
         }
 
         /// <summary>
@@ -81,6 +189,80 @@ namespace ASI.Basecode.WebApp.Controllers
         {
             await this._signInManager.SignOutAsync();
             return Ok();
+        }
+
+        [HttpGet("GetAllUsers")]
+        [AllowAnonymous]
+        public IActionResult GetAllUsers()
+        {
+            try 
+            {
+                var users = _userService.GetUsers();
+                
+                var userList = users.Select(u => new
+                {
+                    id = u.Id,
+                    username = u.UserId,
+                    firstName = u.FirstName,
+                    lastName = u.LastName,
+                    role = u.Role,
+                    name = u.Name,
+                    email = u.Email 
+                }).ToList();
+
+                return Ok(userList);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest($"Failed to get users: {ex.Message}");
+            }
+        }
+
+        [HttpPut("UpdateUser/{id}")]
+        [AllowAnonymous] // Change this to require admin authentication later
+        public IActionResult UpdateUser(int id, [FromBody] UpdateUserRequest request)
+        {
+            try
+            {
+                _userService.UpdateUser(id, new UserViewModel
+                {
+                    UserId = request.UserId,
+                    FirstName = request.FirstName,
+                    LastName = request.LastName,
+                    Role = request.Role
+                });
+
+                return Ok(new { message = "User updated successfully" });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest($"Failed to update user: {ex.Message}");
+            }
+        }
+
+        [HttpDelete("DeleteUser/{id}")]
+        [AllowAnonymous] // Change this to require admin authentication later
+        public IActionResult DeleteUser(int id)
+        {
+            try
+            {
+                _userService.DeleteUser(id);
+                return Ok(new { message = "User deleted successfully" });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest($"Failed to delete user: {ex.Message}");
+            }
+        }
+
+        // Add this class at the end of the AccountController.cs file (outside the controller class)
+        public class UpdateUserRequest
+        {
+            public string UserId { get; set; }
+            public string FirstName { get; set; }
+            public string LastName { get; set; }
+            public string Role { get; set; }
+            public string Email { get; set; }
         }
     }
 }

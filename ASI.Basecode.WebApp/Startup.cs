@@ -82,6 +82,8 @@ namespace ASI.Basecode.WebApp
 
             services.AddMemoryCache();
 
+            services.AddControllers();
+
             // Register SQL database configuration context as services.
             services.AddDbContext<AsiBasecodeDBContext>(options =>
             {
