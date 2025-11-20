@@ -18,10 +18,8 @@ namespace ASI.Basecode.Services.ServiceModels
         public string UpdatedBy { get; set; }
         public DateTime UpdatedTime { get; set; }
 
-        // ✅ Number of matched amenities for sorting
         public int MatchedAmenities { get; set; }
 
-        // ✅ Names of matched amenities for display
         public List<string> MatchedAmenityNames { get; set; } = new List<string>();
     }
 

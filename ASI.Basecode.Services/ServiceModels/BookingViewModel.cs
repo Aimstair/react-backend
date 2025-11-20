@@ -25,9 +25,7 @@ namespace ASI.Basecode.Services.ServiceModels
         public DateTime UpdatedTime { get; set; }
         public List<string> Participants { get; set; }
         public List<string> Amenities { get; set; } = new List<string>();
-
-        // ✅ For recurring suggestions
-        public int MatchedAmenities { get; set; } = 0;            // count of matched amenities
-        public List<string> MatchedAmenityNames { get; set; } = new List<string>(); // matched amenity names
+        public int MatchedAmenities { get; set; } = 0;
+        public List<string> MatchedAmenityNames { get; set; } = new List<string>();
     }
 }

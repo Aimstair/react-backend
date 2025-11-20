@@ -59,7 +59,6 @@ namespace ASI.Basecode.Services.Services
             var usedRoomIds = new HashSet<int>();
             int originalFloor = int.TryParse(originalBooking.Floor, out int fNum) ? fNum : 0;
 
-            // Step 1: Original room
             var originalRoom = allRooms.FirstOrDefault(r => r.Id == originalBooking.RoomId);
             if (originalRoom != null && IsRoomAvailable(originalRoom, date, originalBooking, allBookings))
             {
@@ -68,7 +67,6 @@ namespace ASI.Basecode.Services.Services
                 usedRoomIds.Add(originalRoom.Id);
             }
 
-            // Step 2: Exact matches
             var floorOffsets = new List<int> { 0, 1, -1, 2, -2, 3, -3 };
             foreach (var offset in floorOffsets)
             {
@@ -91,7 +89,6 @@ namespace ASI.Basecode.Services.Services
                 }
             }
 
-            // Step 3: Partial matches
             if (dailySuggestions.Count == 0)
             {
                 foreach (var offset in floorOffsets)

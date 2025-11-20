@@ -332,19 +332,20 @@ namespace ASI.Basecode.Services.Services
             _unitOfWork.SaveChanges();
         }
 
+        //Optional stuff maybe for future features/scaled features
         private void AddBookingAmenities(List<string> amenities, int bookingId)
         {
-            // Optional: persist amenities if needed
+            // For adding required amenities in search
         }
 
         private void UpdateBookingAmenities(List<string> amenities, int bookingId)
         {
-            // Optional: update persisted amenities if implemented
+            // For changing amenities search list
         }
 
         private List<string> GetBookingAmenities(int bookingId)
         {
-            // Optional: retrieve persisted amenities if implemented
+            // If booking is done purely by amenities (rather than match initial booked conditions)
             return new List<string>();
         }
 
