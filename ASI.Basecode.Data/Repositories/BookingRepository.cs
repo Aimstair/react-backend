@@ -14,17 +14,22 @@ namespace ASI.Basecode.Data.Repositories
 
         public IQueryable<Booking> GetBookings()
         {
-            return GetDbSet<Booking>().AsQueryable();
+            return GetDbSet<Booking>()
+                .Include(b => b.Participants)
+                .AsQueryable();
         }
 
         public Booking GetBooking(int id)
         {
-            return GetDbSet<Booking>().FirstOrDefault(b => b.Id == id);
+            return GetDbSet<Booking>()
+                .Include(b => b.Participants)
+                .FirstOrDefault(b => b.Id == id);
         }
 
         public List<Booking> GetBookingsByUser(string username)
         {
             return GetDbSet<Booking>()
+                .Include(b => b.Participants)
                 .Where(b => b.Organizer == username || b.Participants.Any(p => p.UserId == username))
                 .ToList();
         }
@@ -33,6 +38,7 @@ namespace ASI.Basecode.Data.Repositories
         {
             var today = DateTime.Today;
             return GetDbSet<Booking>()
+                .Include(b => b.Participants)
                 .Where(b => (b.Organizer == username || b.Participants.Any(p => p.UserId == username)) && b.Date >= today)
                 .OrderBy(b => b.Date)
                 .ToList();
@@ -42,6 +48,7 @@ namespace ASI.Basecode.Data.Repositories
         {
             var today = DateTime.Today;
             return GetDbSet<Booking>()
+                .Include(b => b.Participants)
                 .Where(b => (b.Organizer == username || b.Participants.Any(p => p.UserId == username)) && b.Date < today)
                 .OrderByDescending(b => b.Date)
                 .ToList();

@@ -82,14 +82,25 @@ namespace ASI.Basecode.WebApp
 
             services.AddMemoryCache();
 
-            services.AddControllers();
+            services.AddControllers()
+                .ConfigureApiBehaviorOptions(options =>
+                {
+                    options.SuppressModelStateInvalidFilter = true;
+                });
 
             // Register SQL database configuration context as services.
             services.AddDbContext<AsiBasecodeDBContext>(options =>
             {
                 options.UseSqlServer(
                     Configuration.GetConnectionString("DefaultConnection"),
-                    sqlServerOptions => sqlServerOptions.CommandTimeout(120));
+                    sqlServerOptions => 
+                    {
+                        sqlServerOptions.CommandTimeout(120);
+                        sqlServerOptions.EnableRetryOnFailure(
+                            maxRetryCount: 5,
+                            maxRetryDelay: TimeSpan.FromSeconds(30),
+                            errorNumbersToAdd: null);
+                    });
             });
 
             services.AddRazorPages().AddRazorRuntimeCompilation();
@@ -141,7 +152,11 @@ namespace ASI.Basecode.WebApp
 
             this._app.UseTokenProvider(_tokenProviderOptions);
 
-            this._app.UseHttpsRedirection();
+            // Only redirect to HTTPS in production
+            if (!this._environment.IsDevelopment())
+            {
+                this._app.UseHttpsRedirection();
+            }
             this._app.UseStaticFiles();
 
             // Localization

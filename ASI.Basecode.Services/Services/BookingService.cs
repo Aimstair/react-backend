@@ -92,8 +92,26 @@ namespace ASI.Basecode.Services.Services
 
         public List<BookingViewModel> GetBookingsByUser(string username)
         {
-            var bookings = _bookingRepository.GetBookingsByUser(username);
-            return bookings.Select(MapToViewModel).ToList();
+            try
+            {
+                if (string.IsNullOrWhiteSpace(username))
+                {
+                    return new List<BookingViewModel>();
+                }
+                
+                var bookings = _bookingRepository.GetBookingsByUser(username);
+                if (bookings == null)
+                {
+                    return new List<BookingViewModel>();
+                }
+                
+                return bookings.Select(MapToViewModel).ToList();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in GetBookingsByUser: {ex.Message}");
+                return new List<BookingViewModel>();
+            }
         }
 
         public List<BookingViewModel> GetUserBookings(string username)

@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
+using ASI.Basecode.WebApp.Models;
 
 namespace ASI.Basecode.WebApp.Controllers
 {
@@ -42,12 +43,19 @@ namespace ASI.Basecode.WebApp.Controllers
         {
             try
             {
+                if (string.IsNullOrWhiteSpace(username))
+                {
+                    return Ok(new List<BookingViewModel>());
+                }
+                
                 var bookings = _bookingService.GetUserBookings(username);
-                return Ok(bookings);
+                return Ok(bookings ?? new List<BookingViewModel>());
             }
             catch (Exception ex)
             {
-                return BadRequest($"Failed to get user bookings: {ex.Message}");
+                Console.WriteLine($"Error in GetUserBookings: {ex.Message}");
+                // Return empty list instead of error to prevent crashes
+                return Ok(new List<BookingViewModel>());
             }
         }
 
@@ -111,6 +119,11 @@ namespace ASI.Basecode.WebApp.Controllers
 
                 Console.WriteLine($"Found {participants.Count} available participants");
 
+                if (participants == null)
+                {
+                    return Ok(new List<object>());
+                }
+
                 return Ok(participants);
             }
             catch (Exception ex)
@@ -118,15 +131,8 @@ namespace ASI.Basecode.WebApp.Controllers
                 Console.WriteLine($"Error in GetAvailableParticipants: {ex.Message}");
                 Console.WriteLine($"Stack trace: {ex.StackTrace}");
 
-                // Return fallback participants
-                return Ok(new List<object>
-        {
-            new { Name = "John Doe", UserId = "john_doe", Email = "john@example.com" },
-            new { Name = "Jane Smith", UserId = "jane_smith", Email = "jane@example.com" },
-            new { Name = "Alice Johnson", UserId = "alice_johnson", Email = "alice@example.com" },
-            new { Name = "Bob Brown", UserId = "bob_brown", Email = "bob@example.com" },
-            new { Name = "Charlie Wilson", UserId = "charlie_wilson", Email = "charlie@example.com" }
-        });
+                // Return empty list instead of fallback to avoid confusion
+                return Ok(new List<object>());
             }
         }
 
@@ -139,25 +145,43 @@ namespace ASI.Basecode.WebApp.Controllers
             {
                 if (booking == null)
                 {
-                    return BadRequest(new { message = "Booking data is required" });
+                    var apiNull = ApiResult<object>.CreateError("Booking data is required");
+                    return BadRequest(apiNull);
                 }
 
-                // Validate required fields
-                if (string.IsNullOrEmpty(booking.RoomName) ||
-                    string.IsNullOrEmpty(booking.Floor) ||
-                    booking.Date == default ||
-                    string.IsNullOrEmpty(booking.StartTime) ||
-                    string.IsNullOrEmpty(booking.EndTime))
+                // ModelState validation (Suppressed automatic filter in Startup to allow custom shape)
+                if (!ModelState.IsValid)
                 {
-                    return BadRequest(new { message = "All required fields must be provided" });
+                    var errors = ModelState.ToDictionary(
+                        kvp => kvp.Key,
+                        kvp => kvp.Value.Errors.Select(e => string.IsNullOrWhiteSpace(e.ErrorMessage) ? e.Exception?.Message ?? "Invalid value" : e.ErrorMessage).ToArray()
+                    );
+
+                    var apiErr = ApiResult<object>.CreateError("Validation failed");
+                    apiErr.Response = errors;
+                    return BadRequest(apiErr);
+                }
+
+                // Check availability before saving
+                var isAvailable = _bookingService.CheckRoomAvailability(booking.RoomId, booking.Date, booking.StartTime, booking.EndTime, null);
+                if (!isAvailable)
+                {
+                    var apiErr = ApiResult<object>.CreateError("Room not available for selected time");
+                    apiErr.Response = new Dictionary<string, string[]>
+                    {
+                        { "StartTime", new[] { "Room is not available for the selected time slot." } }
+                    };
+                    return BadRequest(apiErr);
                 }
 
                 _bookingService.AddBooking(booking);
-                return Ok(new { message = "Booking added successfully" });
+                return Ok(ApiResult<object>.CreateSuccess(null, "Booking added successfully"));
             }
             catch (Exception ex)
             {
-                return BadRequest(new { message = ex.Message, innerException = ex.InnerException?.Message });
+                var apiEx = ApiResult<object>.CreateError(ex.Message);
+                apiEx.Response = new { innerException = ex.InnerException?.Message };
+                return BadRequest(apiEx);
             }
         }
 
@@ -337,12 +361,236 @@ namespace ASI.Basecode.WebApp.Controllers
         {
             try
             {
+                if (roomId <= 0)
+                {
+                    return Ok(new { available = false, error = "Invalid roomId" });
+                }
+
+                if (string.IsNullOrWhiteSpace(startTime) || string.IsNullOrWhiteSpace(endTime))
+                {
+                    return Ok(new { available = false, error = "StartTime and EndTime are required" });
+                }
+
                 var isAvailable = _bookingService.CheckRoomAvailability(roomId, date, startTime, endTime, excludeBookingId);
                 return Ok(new { available = isAvailable });
             }
             catch (Exception ex)
             {
-                return BadRequest($"Failed to check room availability: {ex.Message}");
+                Console.WriteLine($"Error in CheckAvailability: {ex.Message}");
+                Console.WriteLine($"Stack trace: {ex.StackTrace}");
+                return Ok(new { available = false, error = $"Failed to check room availability: {ex.Message}" });
+            }
+        }
+
+        [HttpGet("Health")]
+        [AllowAnonymous]
+        public IActionResult Health()
+        {
+            return Ok(new { status = "healthy", timestamp = DateTime.Now });
+        }
+
+        [HttpPost("ValidateBooking")]
+        [AllowAnonymous]
+        public IActionResult ValidateBooking([FromBody] BookingViewModel booking)
+        {
+            try
+            {
+                if (booking == null)
+                {
+                    return Ok(ApiResult<object>.CreateError("Booking data is required"));
+                }
+
+                var validationErrors = new Dictionary<string, string[]>();
+                var isValid = true;
+
+                // ModelState validation
+                if (!ModelState.IsValid)
+                {
+                    isValid = false;
+                    foreach (var kvp in ModelState)
+                    {
+                        if (kvp.Value.Errors.Count > 0)
+                        {
+                            validationErrors[kvp.Key] = kvp.Value.Errors
+                                .Select(e => string.IsNullOrWhiteSpace(e.ErrorMessage) 
+                                    ? e.Exception?.Message ?? "Invalid value" 
+                                    : e.ErrorMessage)
+                                .ToArray();
+                        }
+                    }
+                }
+
+                // Custom validation using IValidatableObject
+                var validationResults = new List<System.ComponentModel.DataAnnotations.ValidationResult>();
+                var validationContext = new System.ComponentModel.DataAnnotations.ValidationContext(booking);
+                if (!System.ComponentModel.DataAnnotations.Validator.TryValidateObject(booking, validationContext, validationResults, true))
+                {
+                    isValid = false;
+                    foreach (var result in validationResults)
+                    {
+                        foreach (var memberName in result.MemberNames)
+                        {
+                            if (!validationErrors.ContainsKey(memberName))
+                            {
+                                validationErrors[memberName] = new string[] { };
+                            }
+                            var existingErrors = validationErrors[memberName].ToList();
+                            existingErrors.Add(result.ErrorMessage);
+                            validationErrors[memberName] = existingErrors.ToArray();
+                        }
+                    }
+                }
+
+                // Check room availability if basic validation passes
+                if (isValid && booking.RoomId > 0 && booking.Date != default && 
+                    !string.IsNullOrWhiteSpace(booking.StartTime) && !string.IsNullOrWhiteSpace(booking.EndTime))
+                {
+                    var isAvailable = _bookingService.CheckRoomAvailability(booking.RoomId, booking.Date, booking.StartTime, booking.EndTime, booking.Id > 0 ? booking.Id : null);
+                    if (!isAvailable)
+                    {
+                        isValid = false;
+                        if (!validationErrors.ContainsKey("StartTime"))
+                        {
+                            validationErrors["StartTime"] = new string[] { };
+                        }
+                        var existingErrors = validationErrors["StartTime"].ToList();
+                        existingErrors.Add("Room is not available for the selected time slot.");
+                        validationErrors["StartTime"] = existingErrors.ToArray();
+                    }
+                }
+
+                if (isValid)
+                {
+                    return Ok(ApiResult<object>.CreateSuccess("Booking data is valid"));
+                }
+                else
+                {
+                    var apiErr = ApiResult<object>.CreateError("Validation failed");
+                    apiErr.Response = validationErrors;
+                    return Ok(apiErr);
+                }
+            }
+            catch (Exception ex)
+            {
+                var apiEx = ApiResult<object>.CreateError(ex.Message);
+                return BadRequest(apiEx);
+            }
+        }
+
+        [HttpPost("ValidateBookingFields")]
+        [AllowAnonymous]
+        public IActionResult ValidateBookingFields([FromBody] BookingViewModel booking)
+        {
+            try
+            {
+                if (booking == null)
+                {
+                    return Ok(ApiResult<object>.CreateError("Booking data is required"));
+                }
+
+                var fieldErrors = new Dictionary<string, string[]>();
+
+                // Validate required fields
+                if (booking.RoomId <= 0)
+                {
+                    fieldErrors["RoomId"] = new[] { "RoomId is required and must be greater than 0" };
+                }
+
+                if (string.IsNullOrWhiteSpace(booking.RoomName))
+                {
+                    fieldErrors["RoomName"] = new[] { "RoomName is required" };
+                }
+
+                if (string.IsNullOrWhiteSpace(booking.Floor))
+                {
+                    fieldErrors["Floor"] = new[] { "Floor is required" };
+                }
+
+                if (booking.Date == default)
+                {
+                    fieldErrors["Date"] = new[] { "Date is required and must be valid" };
+                }
+                else if (booking.Date < DateTime.Today)
+                {
+                    fieldErrors["Date"] = new[] { "Date cannot be in the past" };
+                }
+
+                if (string.IsNullOrWhiteSpace(booking.StartTime))
+                {
+                    fieldErrors["StartTime"] = new[] { "StartTime is required" };
+                }
+
+                if (string.IsNullOrWhiteSpace(booking.EndTime))
+                {
+                    fieldErrors["EndTime"] = new[] { "EndTime is required" };
+                }
+
+                // Validate time format and order
+                if (!string.IsNullOrWhiteSpace(booking.StartTime) && !string.IsNullOrWhiteSpace(booking.EndTime))
+                {
+                    if (TimeSpan.TryParse(booking.StartTime, out var start) && TimeSpan.TryParse(booking.EndTime, out var end))
+                    {
+                        if (start >= end)
+                        {
+                            if (!fieldErrors.ContainsKey("StartTime"))
+                            {
+                                fieldErrors["StartTime"] = new string[] { };
+                            }
+                            var existingErrors = fieldErrors["StartTime"].ToList();
+                            existingErrors.Add("StartTime must be before EndTime");
+                            fieldErrors["StartTime"] = existingErrors.ToArray();
+                        }
+                    }
+                    else
+                    {
+                        if (!fieldErrors.ContainsKey("StartTime"))
+                        {
+                            fieldErrors["StartTime"] = new string[] { };
+                        }
+                        var existingErrors = fieldErrors["StartTime"].ToList();
+                        existingErrors.Add("StartTime or EndTime have invalid format. Expected format: HH:mm");
+                        fieldErrors["StartTime"] = existingErrors.ToArray();
+                    }
+                }
+
+                // Validate recurring booking fields if Recurring is true
+                if (booking.Recurring)
+                {
+                    if (string.IsNullOrWhiteSpace(booking.Frequency))
+                    {
+                        fieldErrors["Frequency"] = new[] { "Frequency is required for recurring bookings" };
+                    }
+
+                    if (!booking.RecurringEndDate.HasValue)
+                    {
+                        fieldErrors["RecurringEndDate"] = new[] { "RecurringEndDate is required for recurring bookings" };
+                    }
+                    else if (booking.RecurringEndDate.Value < booking.Date)
+                    {
+                        fieldErrors["RecurringEndDate"] = new[] { "RecurringEndDate cannot be before the booking date" };
+                    }
+
+                    if (booking.DaysOfWeek == null || booking.DaysOfWeek.Count == 0)
+                    {
+                        fieldErrors["DaysOfWeek"] = new[] { "DaysOfWeek is required for recurring bookings" };
+                    }
+                }
+
+                if (fieldErrors.Count == 0)
+                {
+                    return Ok(ApiResult<object>.CreateSuccess("All fields are valid"));
+                }
+                else
+                {
+                    var apiErr = ApiResult<object>.CreateError("Field validation failed");
+                    apiErr.Response = fieldErrors;
+                    return Ok(apiErr);
+                }
+            }
+            catch (Exception ex)
+            {
+                var apiEx = ApiResult<object>.CreateError(ex.Message);
+                return BadRequest(apiEx);
             }
         }
 
