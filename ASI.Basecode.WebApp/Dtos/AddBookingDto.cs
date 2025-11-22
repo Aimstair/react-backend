@@ -1,11 +1,10 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
-namespace ASI.Basecode.Services.ServiceModels
+namespace ASI.Basecode.WebApp.Dtos
 {
-    public class BookingViewModel
+    public class AddBookingDto
     {
-        public int Id { get; set; }
         public int RoomId { get; set; }
         public string RoomName { get; set; }
         public string Floor { get; set; }
@@ -19,13 +18,7 @@ namespace ASI.Basecode.Services.ServiceModels
         public DateTime? RecurringEndDate { get; set; }
         public List<string> DaysOfWeek { get; set; }
         public string Image { get; set; }
-        public string CreatedBy { get; set; }
-        public DateTime CreatedTime { get; set; }
-        public string UpdatedBy { get; set; }
-        public DateTime UpdatedTime { get; set; }
         public List<string> Participants { get; set; }
-        public List<string> Amenities { get; set; } = new List<string>();
-        public int MatchedAmenities { get; set; } = 0;
-        public List<string> MatchedAmenityNames { get; set; } = new List<string>();
+        public List<string> Amenities { get; set; }
     }
 }

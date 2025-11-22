@@ -12,10 +12,15 @@ namespace ASI.Basecode.Services.ServiceModels
         public string CoverPhoto { get; set; }
         public bool Available { get; set; }
         public List<AmenityViewModel> Amenities { get; set; } = new List<AmenityViewModel>();
+
         public string CreatedBy { get; set; }
         public DateTime CreatedTime { get; set; }
         public string UpdatedBy { get; set; }
         public DateTime UpdatedTime { get; set; }
+
+        public int MatchedAmenities { get; set; }
+
+        public List<string> MatchedAmenityNames { get; set; } = new List<string>();
     }
 
     public class AmenityViewModel
